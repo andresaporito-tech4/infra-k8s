@@ -4,18 +4,16 @@ Write-Host "======================================="
 
 $ErrorActionPreference = "Stop"
 
-# -------------------------------------------------
-# AJUSTE CRÍTICO PARA GITHUB ACTIONS / SERVICE
-# -------------------------------------------------
-# Quando rodar no GitHub Actions, garante que o script
-# execute a partir da pasta infra-k8s correta
-if ($env:GITHUB_WORKSPACE) {
-    Set-Location "$env:GITHUB_WORKSPACE\infra-k8s"
-}
+# ----------------------------------------
+# CONTEXTO
+# ----------------------------------------
+# O script SEMPRE roda na raiz do repositório
+$ROOT = Get-Location
+Write-Host "Diretorio atual: $ROOT"
 
-# -------------------------------
-# CONFIGURAÇÕES
-# -------------------------------
+# ----------------------------------------
+# CONFIGURACOES
+# ----------------------------------------
 $NAMESPACE = "fiap-cloud-games"
 
 $SERVICES = @(
@@ -26,16 +24,18 @@ $SERVICES = @(
     @{ Name = "gateway-api";       Path = "..\gateway-api";       Image = "gateway-api:latest" }
 )
 
-# -------------------------------
-# FUNÇÃO: localizar Dockerfile automaticamente
-# -------------------------------
+# ----------------------------------------
+# FUNCAO: localizar Dockerfile
+# ----------------------------------------
 function Find-DockerfileFolder {
     param ([string]$BasePath)
 
-    $ResolvedPath = Resolve-Path $BasePath -ErrorAction Stop
+    if (-not (Test-Path $BasePath)) {
+        throw "Caminho base nao existe: $BasePath"
+    }
 
     $dockerfile = Get-ChildItem `
-        -Path $ResolvedPath `
+        -Path $BasePath `
         -Recurse `
         -Filter "Dockerfile" `
         -File `
@@ -43,83 +43,68 @@ function Find-DockerfileFolder {
         Select-Object -First 1
 
     if (-not $dockerfile) {
-        throw "Dockerfile não encontrado em $BasePath"
+        throw "Dockerfile nao encontrado em $BasePath"
     }
 
     return $dockerfile.Directory.FullName
 }
 
-# -------------------------------
+# ----------------------------------------
 # [0/6] VALIDAR AMBIENTE
-# -------------------------------
-Write-Host "`n[0/6] Validando ambiente..."
+# ----------------------------------------
+Write-Host ""
+Write-Host "[0/6] Validando ambiente..."
 
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Error "Docker não encontrado. Instale o Docker Desktop."
-    exit 1
-}
+docker info > $null
+kubectl version --client > $null
+kubectl cluster-info > $null
 
-if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
-    Write-Error "kubectl não encontrado."
-    exit 1
-}
+Write-Host "Docker e Kubernetes OK"
 
-kubectl cluster-info > $null 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "❌ Kubernetes NÃO está ativo no Docker Desktop." -ForegroundColor Red
-    Write-Host "➡️  Ative em: Docker Desktop > Settings > Kubernetes > Enable Kubernetes"
-    Write-Host "➡️  Aguarde o status ficar 'Running' e execute novamente."
-    Write-Host ""
-    exit 1
-}
-
-Write-Host "✅ Docker e Kubernetes OK" -ForegroundColor Green
-
-# -------------------------------
+# ----------------------------------------
 # [1/6] BUILD DAS IMAGENS
-# -------------------------------
-Write-Host "`n[1/6] Buildando imagens Docker..."
+# ----------------------------------------
+Write-Host ""
+Write-Host "[1/6] Buildando imagens Docker..."
 
 foreach ($svc in $SERVICES) {
-    Write-Host "-> Build $($svc.Name)"
+    Write-Host "Build: $($svc.Name)"
 
     $dockerPath = Find-DockerfileFolder $svc.Path
-    Write-Host "   Dockerfile encontrado em: $dockerPath"
+    Write-Host "Dockerfile em: $dockerPath"
 
     docker build -t $svc.Image $dockerPath
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Erro ao buildar $($svc.Name)"
-    }
 }
 
-# -------------------------------
+# ----------------------------------------
 # [2/6] GARANTIR NAMESPACE
-# -------------------------------
-Write-Host "`n[2/6] Garantindo namespace..."
+# ----------------------------------------
+Write-Host ""
+Write-Host "[2/6] Garantindo namespace..."
 
 kubectl get namespace $NAMESPACE > $null 2>&1
 if ($LASTEXITCODE -ne 0) {
     kubectl create namespace $NAMESPACE
-    Write-Host "Namespace criado: $NAMESPACE"
+    Write-Host "Namespace criado"
 } else {
-    Write-Host "Namespace já existe"
+    Write-Host "Namespace ja existe"
 }
 
-# -------------------------------
+# ----------------------------------------
 # [3/6] INFRAESTRUTURA
-# -------------------------------
-Write-Host "`n[3/6] Aplicando infraestrutura..."
+# ----------------------------------------
+Write-Host ""
+Write-Host "[3/6] Aplicando infraestrutura..."
 
-kubectl apply -f k8s/postgres    -n $NAMESPACE
-kubectl apply -f k8s/rabbitmq    -n $NAMESPACE
-kubectl apply -f k8s/monitoring  -n $NAMESPACE
+kubectl apply -f k8s/postgres   -n $NAMESPACE
+kubectl apply -f k8s/rabbitmq   -n $NAMESPACE
+kubectl apply -f k8s/monitoring -n $NAMESPACE
 
-# -------------------------------
-# [4/6] MICROSSERVIÇOS
-# -------------------------------
-Write-Host "`n[4/6] Aplicando microsserviços..."
+# ----------------------------------------
+# [4/6] MICROSSERVICOS
+# ----------------------------------------
+Write-Host ""
+Write-Host "[4/6] Aplicando microsservicos..."
 
 kubectl apply -f k8s/payments-api      -n $NAMESPACE
 kubectl apply -f k8s/payments-consumer -n $NAMESPACE
@@ -127,14 +112,16 @@ kubectl apply -f k8s/users-api         -n $NAMESPACE
 kubectl apply -f k8s/games-api         -n $NAMESPACE
 kubectl apply -f k8s/gateway-api       -n $NAMESPACE
 
-# -------------------------------
+# ----------------------------------------
 # [5/6] STATUS FINAL
-# -------------------------------
-Write-Host "`n[5/6] Status final:`n"
+# ----------------------------------------
+Write-Host ""
+Write-Host "[5/6] Status final:"
 
 kubectl get pods -n $NAMESPACE
 kubectl get svc  -n $NAMESPACE
 kubectl get hpa  -n $NAMESPACE
 
-Write-Host "`n🚀 Deploy finalizado com sucesso!" -ForegroundColor Green
+Write-Host ""
+Write-Host "Deploy finalizado com sucesso"
 Write-Host "======================================="
