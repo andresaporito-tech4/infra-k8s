@@ -13,8 +13,9 @@ jobs:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Deploy local Kubernetes
+      - name: Executar deploy local Kubernetes
         shell: powershell
         run: |
-          cd infra-k8s
+          pwd
+          ls
           .\deploy.ps1
