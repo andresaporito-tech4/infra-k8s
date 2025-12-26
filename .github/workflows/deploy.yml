@@ -18,19 +18,21 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------------------------------------------------
-      # 2️⃣ Debug - ambiente do runner
+      # 2️⃣ Debug do ambiente do runner
       # ---------------------------------------------------
       - name: Debug ambiente
         shell: powershell
         run: |
+          Write-Host "=== DEBUG RUNNER ==="
           Write-Host "USER: $env:USERNAME"
-          Write-Host "WORKSPACE:"
+          Write-Host "WORKDIR:"
           Get-Location
           Write-Host "Conteúdo do workspace:"
           Get-ChildItem
+          Write-Host "===================="
 
       # ---------------------------------------------------
-      # 3️⃣ Configurar kubeconfig (runner como serviço)
+      # 3️⃣ Configurar kubeconfig (Docker Desktop)
       # ---------------------------------------------------
       - name: Configurar kubeconfig Docker Desktop
         shell: powershell
@@ -47,8 +49,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
           Copy-Item $source $target -Force
 
-          echo "KUBECONFIG=$target" >> $env:GITHUB_ENV
-          Write-Host "✅ KUBECONFIG configurado"
+          "KUBECONFIG=$target" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "✅ KUBECONFIG configurado em $target"
 
       # ---------------------------------------------------
       # 4️⃣ Validar Kubernetes
@@ -58,9 +60,10 @@ jobs:
         run: |
           kubectl version --client
           kubectl cluster-info
+          kubectl get nodes
 
       # ---------------------------------------------------
-      # 5️⃣ Deploy (SEM cd infra-k8s)
+      # 5️⃣ Executar deploy.ps1
       # ---------------------------------------------------
       - name: Deploy local Kubernetes
         shell: powershell
