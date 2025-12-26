@@ -5,10 +5,17 @@ Write-Host "======================================="
 $ErrorActionPreference = "Stop"
 
 # ----------------------------------------
-# CONTEXTO
+# CONTEXTO CORRETO (RAIZ DO REPO)
 # ----------------------------------------
-$ROOT = Get-Location
-Write-Host "Diretorio atual: $ROOT"
+# deploy.ps1 está em infra-k8s/
+# raiz do repo = um nivel acima
+$SCRIPT_DIR = $PSScriptRoot
+$REPO_ROOT  = Resolve-Path "$SCRIPT_DIR\.."
+
+Set-Location $SCRIPT_DIR
+
+Write-Host "Diretorio do script : $SCRIPT_DIR"
+Write-Host "Raiz do repositorio : $REPO_ROOT"
 
 # ----------------------------------------
 # CONFIGURACOES
@@ -16,11 +23,11 @@ Write-Host "Diretorio atual: $ROOT"
 $NAMESPACE = "fiap-cloud-games"
 
 $SERVICES = @(
-    @{ Name = "payments-api";      Path = "..\payments-api";      Image = "payments-api:latest" },
-    @{ Name = "payments-consumer"; Path = "..\payments-consumer"; Image = "payments-consumer:latest" },
-    @{ Name = "users-api";         Path = "..\users-api";         Image = "users-api:latest" },
-    @{ Name = "games-api";         Path = "..\games-api";         Image = "games-api:latest" },
-    @{ Name = "gateway-api";       Path = "..\gateway-api";       Image = "gateway-api:latest" }
+    @{ Name = "payments-api";      Path = "$REPO_ROOT\payments-api";      Image = "payments-api:latest" },
+    @{ Name = "payments-consumer"; Path = "$REPO_ROOT\payments-consumer"; Image = "payments-consumer:latest" },
+    @{ Name = "users-api";         Path = "$REPO_ROOT\users-api";         Image = "users-api:latest" },
+    @{ Name = "games-api";         Path = "$REPO_ROOT\games-api";         Image = "games-api:latest" },
+    @{ Name = "gateway-api";       Path = "$REPO_ROOT\gateway-api";       Image = "gateway-api:latest" }
 )
 
 # ----------------------------------------
@@ -95,9 +102,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "[3/6] Aplicando infraestrutura..."
 
-kubectl apply -f k8s/postgres   -n $NAMESPACE
-kubectl apply -f k8s/rabbitmq   -n $NAMESPACE
-kubectl apply -f k8s/monitoring -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\postgres"   -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\rabbitmq"   -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\monitoring" -n $NAMESPACE
 
 # ----------------------------------------
 # [4/6] MICROSSERVICOS
@@ -105,11 +112,11 @@ kubectl apply -f k8s/monitoring -n $NAMESPACE
 Write-Host ""
 Write-Host "[4/6] Aplicando microsservicos..."
 
-kubectl apply -f k8s/payments-api      -n $NAMESPACE
-kubectl apply -f k8s/payments-consumer -n $NAMESPACE
-kubectl apply -f k8s/users-api         -n $NAMESPACE
-kubectl apply -f k8s/games-api         -n $NAMESPACE
-kubectl apply -f k8s/gateway-api       -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\payments-api"      -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\payments-consumer" -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\users-api"         -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\games-api"         -n $NAMESPACE
+kubectl apply -f "$SCRIPT_DIR\k8s\gateway-api"       -n $NAMESPACE
 
 # ----------------------------------------
 # [5/6] STATUS FINAL
