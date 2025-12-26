@@ -7,7 +7,6 @@ $ErrorActionPreference = "Stop"
 # ----------------------------------------
 # CONTEXTO
 # ----------------------------------------
-# O script SEMPRE roda na raiz do repositório
 $ROOT = Get-Location
 Write-Host "Diretorio atual: $ROOT"
 
@@ -31,7 +30,7 @@ function Find-DockerfileFolder {
     param ([string]$BasePath)
 
     if (-not (Test-Path $BasePath)) {
-        throw "Caminho base nao existe: $BasePath"
+        throw "Caminho nao existe: $BasePath"
     }
 
     $dockerfile = Get-ChildItem `
