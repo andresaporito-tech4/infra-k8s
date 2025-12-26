@@ -1,4 +1,4 @@
-name: Deploy FIAP Cloud Games (Local)
+name: Deploy Local Kubernetes
 
 on:
   push:
@@ -7,15 +7,31 @@ on:
 
 jobs:
   deploy:
+    name: Deploy local Kubernetes
     runs-on: self-hosted
 
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Executar deploy local Kubernetes
+      - name: Exibir diretório de trabalho
         shell: powershell
         run: |
-          pwd
-          ls
+          Write-Host "Workspace: $env:GITHUB_WORKSPACE"
+          Get-ChildItem $env:GITHUB_WORKSPACE
+
+      - name: Garantir Docker ativo
+        shell: powershell
+        run: |
+          docker info
+
+      - name: Garantir Kubernetes ativo
+        shell: powershell
+        run: |
+          kubectl cluster-info
+
+      - name: Executar deploy.ps1
+        shell: powershell
+        run: |
+          cd infra-k8s
           .\deploy.ps1
