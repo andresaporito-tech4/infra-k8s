@@ -1,0 +1,20 @@
+name: Deploy FIAP Cloud Games (Local)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Deploy local Kubernetes
+        shell: powershell
+        run: |
+          cd infra-k8s
+          .\deploy.ps1
