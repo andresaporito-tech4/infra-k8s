@@ -7,28 +7,25 @@ on:
 
 jobs:
   deploy:
-    name: Deploy local Kubernetes
     runs-on: self-hosted
 
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Exibir diretório de trabalho
+      - name: Configurar kubeconfig para runner
         shell: powershell
         run: |
-          Write-Host "Workspace: $env:GITHUB_WORKSPACE"
-          Get-ChildItem $env:GITHUB_WORKSPACE
+          $env:KUBECONFIG="C:\Users\Public\.kube\config"
+          kubectl config get-contexts
 
       - name: Garantir Docker ativo
         shell: powershell
-        run: |
-          docker info
+        run: docker info
 
       - name: Garantir Kubernetes ativo
         shell: powershell
-        run: |
-          kubectl cluster-info
+        run: kubectl cluster-info
 
       - name: Executar deploy.ps1
         shell: powershell
