@@ -11,81 +11,63 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # ---------------------------------------------------
+      # 1️⃣ Checkout do código
+      # ---------------------------------------------------
       - name: Checkout do código
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------
+      # 2️⃣ DEBUG - Mostrar usuário e diretórios
+      # ---------------------------------------------------
       - name: Debug - ambiente do runner
         shell: powershell
         run: |
-          Write-Host "===== DEBUG RUNNER ====="
-          Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          Write-Host "Runner user (whoami):"
-          whoami
-          Write-Host ""
-
-          Write-Host "Diretório atual:"
+          Write-Host "USER: $env:USERNAME"
+          Write-Host "HOME: $env:USERPROFILE"
+          Write-Host "PWD:"
           Get-Location
-          Write-Host ""
+          Write-Host "Conteúdo do workspace:"
+          Get-ChildItem
 
-          Write-Host "Listando raiz do workspace:"
-          Get-ChildItem -Path $env:GITHUB_WORKSPACE | Select-Object Name,Mode,LastWriteTime
-          Write-Host ""
-
-          Write-Host "kubectl version (client):"
-          kubectl version --client
-          Write-Host ""
-
-          Write-Host "docker info (resumo):"
-          docker info --format '{{.ServerVersion}}'
-          Write-Host "========================"
-
-      - name: Debug - procurar kubeconfig no disco
+      # ---------------------------------------------------
+      # 3️⃣ CONFIGURAR KUBECONFIG (SOLUÇÃO DEFINITIVA)
+      # ---------------------------------------------------
+      - name: Configurar kubeconfig do Docker Desktop
         shell: powershell
         run: |
-          Write-Host "===== DEBUG KUBECONFIG ====="
-          Write-Host "Checando caminhos comuns:"
-          $paths = @(
-            "C:\Users\Public\.kube\config",
-            "C:\Windows\System32\config\systemprofile\.kube\config",
-            "C:\ProgramData\DockerDesktop\pki\kubeconfig.yaml",
-            "C:\ProgramData\DockerDesktop\pki\kubeconfig",
-            "$env:USERPROFILE\.kube\config"
-          )
+          $source = "C:\Users\Matheus\.kube\config"
+          $targetDir = "C:\actions-runner\_kube"
+          $target = "$targetDir\config"
 
-          foreach ($p in $paths) {
-            if (Test-Path $p) {
-              Write-Host "✅ FOUND: $p"
-            } else {
-              Write-Host "❌ NOT FOUND: $p"
-            }
+          Write-Host "Procurando kubeconfig em: $source"
+
+          if (-not (Test-Path $source)) {
+            Write-Error "❌ kubeconfig do usuário NÃO encontrado em $source"
+            exit 1
           }
 
-          Write-Host ""
-          Write-Host "Procurando qualquer '.kube\config' (pode demorar um pouco)..."
-          Get-ChildItem -Path C:\ -Recurse -Force -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match "\\.kube\\config$" } |
-            Select-Object -First 30 FullName
+          New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+          Copy-Item $source $target -Force
 
-          Write-Host "============================="
+          Write-Host "✅ kubeconfig copiado para $target"
+          echo "KUBECONFIG=$target" >> $env:GITHUB_ENV
 
-      - name: Configurar kubeconfig (tentativa padrão)
-        shell: powershell
-        run: |
-          $env:KUBECONFIG="C:\Users\Public\.kube\config"
-          Write-Host "KUBECONFIG=$env:KUBECONFIG"
-          if (!(Test-Path $env:KUBECONFIG)) {
-            Write-Host "⚠️ kubeconfig padrão não existe. O step de debug acima vai mostrar o caminho correto."
-          } else {
-            Write-Host "✅ kubeconfig padrão encontrado."
-          }
-
+      # ---------------------------------------------------
+      # 4️⃣ VALIDAR KUBERNETES
+      # ---------------------------------------------------
       - name: Garantir Kubernetes ativo
         shell: powershell
         run: |
+          kubectl version --client
           kubectl cluster-info
 
-      - name: Executar deploy.ps1
+      # ---------------------------------------------------
+      # 5️⃣ RODAR SCRIPT DE DEPLOY
+      # ---------------------------------------------------
+      - name: Deploy local Kubernetes
         shell: powershell
         run: |
           cd infra-k8s
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
           .\deploy.ps1
