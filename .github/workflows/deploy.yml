@@ -18,56 +18,52 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------------------------------------------------
-      # 2️⃣ DEBUG - Mostrar usuário e diretórios
+      # 2️⃣ Debug - ambiente do runner
       # ---------------------------------------------------
-      - name: Debug - ambiente do runner
+      - name: Debug ambiente
         shell: powershell
         run: |
           Write-Host "USER: $env:USERNAME"
-          Write-Host "HOME: $env:USERPROFILE"
-          Write-Host "PWD:"
+          Write-Host "WORKSPACE:"
           Get-Location
           Write-Host "Conteúdo do workspace:"
           Get-ChildItem
 
       # ---------------------------------------------------
-      # 3️⃣ CONFIGURAR KUBECONFIG (SOLUÇÃO DEFINITIVA)
+      # 3️⃣ Configurar kubeconfig (runner como serviço)
       # ---------------------------------------------------
-      - name: Configurar kubeconfig do Docker Desktop
+      - name: Configurar kubeconfig Docker Desktop
         shell: powershell
         run: |
           $source = "C:\Users\Matheus\.kube\config"
           $targetDir = "C:\actions-runner\_kube"
           $target = "$targetDir\config"
 
-          Write-Host "Procurando kubeconfig em: $source"
-
           if (-not (Test-Path $source)) {
-            Write-Error "❌ kubeconfig do usuário NÃO encontrado em $source"
+            Write-Error "❌ kubeconfig não encontrado em $source"
             exit 1
           }
 
           New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
           Copy-Item $source $target -Force
 
-          Write-Host "✅ kubeconfig copiado para $target"
           echo "KUBECONFIG=$target" >> $env:GITHUB_ENV
+          Write-Host "✅ KUBECONFIG configurado"
 
       # ---------------------------------------------------
-      # 4️⃣ VALIDAR KUBERNETES
+      # 4️⃣ Validar Kubernetes
       # ---------------------------------------------------
-      - name: Garantir Kubernetes ativo
+      - name: Validar Kubernetes
         shell: powershell
         run: |
           kubectl version --client
           kubectl cluster-info
 
       # ---------------------------------------------------
-      # 5️⃣ RODAR SCRIPT DE DEPLOY
+      # 5️⃣ Deploy (SEM cd infra-k8s)
       # ---------------------------------------------------
       - name: Deploy local Kubernetes
         shell: powershell
         run: |
-          cd infra-k8s
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
           .\deploy.ps1
