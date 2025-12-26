@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-api
+  namespace: fiap-cloud-games
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-api
+  template:
+    metadata:
+      labels:
+        app: gateway-api
+    spec:
+      containers:
+        - name: gateway-api
+          image: andresaporito/gateway-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: gateway-api-config
+            - secretRef:
+                name: gateway-api-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
