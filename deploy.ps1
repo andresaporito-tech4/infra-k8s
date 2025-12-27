@@ -1,82 +1,64 @@
 Write-Host "======================================="
-Write-Host " FIAP Cloud Games - Infra Kubernetes"
+Write-Host " FIAP Cloud Games - Infra Deploy"
 Write-Host "======================================="
 
 $ErrorActionPreference = "Stop"
 
 # ----------------------------------------
+# CONTEXTO
+# ----------------------------------------
+$SCRIPT_DIR = $PSScriptRoot
+Set-Location $SCRIPT_DIR
+Write-Host "Diretorio de execucao: $SCRIPT_DIR"
+
+# ----------------------------------------
 # CONFIGURACOES
 # ----------------------------------------
-$NAMESPACE  = "fiap-cloud-games"
-$SCRIPT_DIR = $PSScriptRoot
-
-Set-Location $SCRIPT_DIR
+$NAMESPACE = "fiap-cloud-games"
 
 # ----------------------------------------
-# [0/5] VALIDAR AMBIENTE
+# [0/4] VALIDAR AMBIENTE
 # ----------------------------------------
 Write-Host ""
-Write-Host "[0/5] Validando ambiente local..."
+Write-Host "[0/4] Validando ambiente local..."
 
 docker info > $null
-kubectl version --client > $null
-
-Write-Host "Validando cluster Kubernetes..."
 kubectl cluster-info > $null
 
-Write-Host "Docker e Kubernetes ativos OK"
+Write-Host "Docker e Kubernetes OK"
 
 # ----------------------------------------
-# [1/5] GARANTIR NAMESPACE
+# [1/4] GARANTIR NAMESPACE (IDEMPOTENTE)
 # ----------------------------------------
 Write-Host ""
-Write-Host "[1/5] Garantindo namespace..."
+Write-Host "[1/4] Garantindo namespace..."
 
-$ns = kubectl get namespace $NAMESPACE -o name --ignore-not-found
-if (-not $ns) {
-    kubectl create namespace $NAMESPACE
-    Write-Host "Namespace criado"
-}
-else {
-    Write-Host "Namespace ja existe"
-}
+kubectl create namespace $NAMESPACE `
+    --dry-run=client `
+    -o yaml | kubectl apply -f -
+
+Write-Host "Namespace garantido: $NAMESPACE"
 
 # ----------------------------------------
-# [2/5] INFRAESTRUTURA BASE
+# [2/4] INFRAESTRUTURA BASE
 # ----------------------------------------
 Write-Host ""
-Write-Host "[2/5] Aplicando infraestrutura base..."
+Write-Host "[2/4] Aplicando infraestrutura base..."
 
-kubectl apply -f "$SCRIPT_DIR\k8s\namespace.yaml"
-kubectl apply -f "$SCRIPT_DIR\k8s\postgres"   -n $NAMESPACE
-kubectl apply -f "$SCRIPT_DIR\k8s\rabbitmq"   -n $NAMESPACE
-kubectl apply -f "$SCRIPT_DIR\k8s\monitoring" -n $NAMESPACE
-
-# ----------------------------------------
-# [3/5] MICROSSERVICOS (SOMENTE MANIFESTS)
-# ----------------------------------------
-Write-Host ""
-Write-Host "[3/5] Aplicando manifests de microsservicos..."
-
-kubectl apply -f "$SCRIPT_DIR\k8s\payments-api"      -n $NAMESPACE
-kubectl apply -f "$SCRIPT_DIR\k8s\payments-consumer" -n $NAMESPACE
-kubectl apply -f "$SCRIPT_DIR\k8s\users-api"         -n $NAMESPACE
-kubectl apply -f "$SCRIPT_DIR\k8s\games-api"         -n $NAMESPACE
-kubectl apply -f "$SCRIPT_DIR\k8s\gateway-api"       -n $NAMESPACE
+kubectl apply -f k8s/postgres              -n $NAMESPACE
+kubectl apply -f k8s/rabbitmq              -n $NAMESPACE
+kubectl apply -f k8s/monitoring/prometheus -n $NAMESPACE
+kubectl apply -f k8s/monitoring/grafana    -n $NAMESPACE
 
 # ----------------------------------------
-# [4/5] STATUS FINAL
+# [3/4] STATUS FINAL
 # ----------------------------------------
 Write-Host ""
-Write-Host "[4/5] Status final do cluster:"
+Write-Host "[3/4] Status final da infraestrutura:"
 
 kubectl get pods -n $NAMESPACE
 kubectl get svc  -n $NAMESPACE
-kubectl get hpa  -n $NAMESPACE
 
-# ----------------------------------------
-# [5/5] FINALIZACAO
-# ----------------------------------------
 Write-Host ""
-Write-Host "Infra Kubernetes aplicada com sucesso"
+Write-Host "Infraestrutura Kubernetes aplicada com sucesso"
 Write-Host "======================================="
