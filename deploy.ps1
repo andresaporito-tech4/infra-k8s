@@ -1,92 +1,40 @@
 Write-Host "======================================="
-Write-Host " FIAP Cloud Games - Local Deploy Script"
+Write-Host " FIAP Cloud Games - Infra Kubernetes"
 Write-Host "======================================="
 
 $ErrorActionPreference = "Stop"
 
 # ----------------------------------------
-# CONTEXTO CORRETO (RAIZ DO REPO)
+# CONFIGURACOES
 # ----------------------------------------
-# deploy.ps1 está em infra-k8s/
-# raiz do repo = um nivel acima
+$NAMESPACE  = "fiap-cloud-games"
 $SCRIPT_DIR = $PSScriptRoot
-$REPO_ROOT  = Resolve-Path "$SCRIPT_DIR\.."
 
 Set-Location $SCRIPT_DIR
 
-Write-Host "Diretorio do script : $SCRIPT_DIR"
-Write-Host "Raiz do repositorio : $REPO_ROOT"
-
 # ----------------------------------------
-# CONFIGURACOES
-# ----------------------------------------
-$NAMESPACE = "fiap-cloud-games"
-
-$SERVICES = @(
-    @{ Name = "payments-api";      Path = "$REPO_ROOT\payments-api";      Image = "payments-api:latest" },
-    @{ Name = "payments-consumer"; Path = "$REPO_ROOT\payments-consumer"; Image = "payments-consumer:latest" },
-    @{ Name = "users-api";         Path = "$REPO_ROOT\users-api";         Image = "users-api:latest" },
-    @{ Name = "games-api";         Path = "$REPO_ROOT\games-api";         Image = "games-api:latest" },
-    @{ Name = "gateway-api";       Path = "$REPO_ROOT\gateway-api";       Image = "gateway-api:latest" }
-)
-
-# ----------------------------------------
-# FUNCAO: localizar Dockerfile
-# ----------------------------------------
-function Find-DockerfileFolder {
-    param ([string]$BasePath)
-
-    if (-not (Test-Path $BasePath)) {
-        throw "Caminho nao existe: $BasePath"
-    }
-
-    $dockerfile = Get-ChildItem `
-        -Path $BasePath `
-        -Recurse `
-        -Filter "Dockerfile" `
-        -File `
-        -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-
-    if (-not $dockerfile) {
-        throw "Dockerfile nao encontrado em $BasePath"
-    }
-
-    return $dockerfile.Directory.FullName
-}
-
-# ----------------------------------------
-# [0/6] VALIDAR AMBIENTE
+# [0/5] VALIDAR AMBIENTE
 # ----------------------------------------
 Write-Host ""
-Write-Host "[0/6] Validando ambiente..."
+Write-Host "[0/5] Validando ambiente local..."
 
+# Docker
 docker info > $null
+
+# Kubectl client
 kubectl version --client > $null
+
+# Kubernetes cluster ATIVO (validação real)
+Write-Host "Validando cluster Kubernetes..."
 kubectl cluster-info > $null
 
-Write-Host "Docker e Kubernetes OK"
+Write-Host "Docker e Kubernetes ativos ✔"
 
 # ----------------------------------------
-# [1/6] BUILD DAS IMAGENS
-# ----------------------------------------
-Write-Host ""
-Write-Host "[1/6] Buildando imagens Docker..."
-
-foreach ($svc in $SERVICES) {
-    Write-Host "Build: $($svc.Name)"
-
-    $dockerPath = Find-DockerfileFolder $svc.Path
-    Write-Host "Dockerfile em: $dockerPath"
-
-    docker build -t $svc.Image $dockerPath
-}
-
-# ----------------------------------------
-# [2/6] GARANTIR NAMESPACE
+# [1/5] GARANTIR NAMESPACE
 # ----------------------------------------
 Write-Host ""
-Write-Host "[2/6] Garantindo namespace..."
+Write-Host "[1/5] Garantindo namespace..."
 
 kubectl get namespace $NAMESPACE > $null 2>&1
 if ($LASTEXITCODE -ne 0) {
@@ -97,20 +45,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ----------------------------------------
-# [3/6] INFRAESTRUTURA
+# [2/5] INFRAESTRUTURA BASE
 # ----------------------------------------
 Write-Host ""
-Write-Host "[3/6] Aplicando infraestrutura..."
+Write-Host "[2/5] Aplicando infraestrutura base..."
 
+kubectl apply -f "$SCRIPT_DIR\k8s\namespace.yaml"
 kubectl apply -f "$SCRIPT_DIR\k8s\postgres"   -n $NAMESPACE
 kubectl apply -f "$SCRIPT_DIR\k8s\rabbitmq"   -n $NAMESPACE
 kubectl apply -f "$SCRIPT_DIR\k8s\monitoring" -n $NAMESPACE
 
 # ----------------------------------------
-# [4/6] MICROSSERVICOS
+# [3/5] MICROSSERVICOS (SOMENTE MANIFESTS)
 # ----------------------------------------
 Write-Host ""
-Write-Host "[4/6] Aplicando microsservicos..."
+Write-Host "[3/5] Aplicando manifests de microsservicos..."
 
 kubectl apply -f "$SCRIPT_DIR\k8s\payments-api"      -n $NAMESPACE
 kubectl apply -f "$SCRIPT_DIR\k8s\payments-consumer" -n $NAMESPACE
@@ -119,15 +68,18 @@ kubectl apply -f "$SCRIPT_DIR\k8s\games-api"         -n $NAMESPACE
 kubectl apply -f "$SCRIPT_DIR\k8s\gateway-api"       -n $NAMESPACE
 
 # ----------------------------------------
-# [5/6] STATUS FINAL
+# [4/5] STATUS FINAL
 # ----------------------------------------
 Write-Host ""
-Write-Host "[5/6] Status final:"
+Write-Host "[4/5] Status final do cluster:"
 
 kubectl get pods -n $NAMESPACE
 kubectl get svc  -n $NAMESPACE
 kubectl get hpa  -n $NAMESPACE
 
+# ----------------------------------------
+# [5/5] FINALIZACAO
+# ----------------------------------------
 Write-Host ""
-Write-Host "Deploy finalizado com sucesso"
+Write-Host "Infra Kubernetes aplicada com sucesso"
 Write-Host "======================================="
