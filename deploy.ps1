@@ -18,13 +18,9 @@ Set-Location $SCRIPT_DIR
 Write-Host ""
 Write-Host "[0/5] Validando ambiente local..."
 
-# Docker
 docker info > $null
-
-# Kubectl client
 kubectl version --client > $null
 
-# Kubernetes cluster ativo
 Write-Host "Validando cluster Kubernetes..."
 kubectl cluster-info > $null
 
@@ -36,7 +32,7 @@ Write-Host "Docker e Kubernetes ativos OK"
 Write-Host ""
 Write-Host "[1/5] Garantindo namespace..."
 
-$ns = kubectl get namespace $NAMESPACE -o name 2>$null
+$ns = kubectl get namespace $NAMESPACE -o name --ignore-not-found
 if (-not $ns) {
     kubectl create namespace $NAMESPACE
     Write-Host "Namespace criado"
