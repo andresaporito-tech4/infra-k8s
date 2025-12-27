@@ -24,11 +24,11 @@ docker info > $null
 # Kubectl client
 kubectl version --client > $null
 
-# Kubernetes cluster ATIVO (validação real)
+# Kubernetes cluster ativo
 Write-Host "Validando cluster Kubernetes..."
 kubectl cluster-info > $null
 
-Write-Host "Docker e Kubernetes ativos ✔"
+Write-Host "Docker e Kubernetes ativos OK"
 
 # ----------------------------------------
 # [1/5] GARANTIR NAMESPACE
@@ -36,11 +36,12 @@ Write-Host "Docker e Kubernetes ativos ✔"
 Write-Host ""
 Write-Host "[1/5] Garantindo namespace..."
 
-kubectl get namespace $NAMESPACE > $null 2>&1
-if ($LASTEXITCODE -ne 0) {
+$ns = kubectl get namespace $NAMESPACE -o name 2>$null
+if (-not $ns) {
     kubectl create namespace $NAMESPACE
     Write-Host "Namespace criado"
-} else {
+}
+else {
     Write-Host "Namespace ja existe"
 }
 
